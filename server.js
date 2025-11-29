@@ -16,12 +16,22 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 /**
- * 取得高雄天氣預報
- * CWA 氣象資料開放平臺 API
+ * ⭐更新註解：
+ * 動態取得指定城市天氣預報
  * 使用「一般天氣預報-今明 36 小時天氣預報」資料集
+ * 查詢範例：/weather/高雄市
  */
-const getKaohsiungWeather = async (req, res) => {
+const getWeatherByCity = async (req, res) => {
   try {
+    const city = req.params.city;
+
+    if (!city) {
+      return res.status(400).json({
+        error: "缺少城市名稱",
+        example: "/api/weather/台北市",
+      });
+    }
+
     // 檢查是否有設定 API Key
     if (!CWA_API_KEY) {
       return res.status(500).json({
@@ -32,23 +42,24 @@ const getKaohsiungWeather = async (req, res) => {
 
     // 呼叫 CWA API - 一般天氣預報（36小時）
     // API 文件: https://opendata.cwa.gov.tw/dist/opendata-swagger.html
+    // ⭐更新：用 city 動態查詢，而不是固定「高雄市」
     const response = await axios.get(
       `${CWA_API_BASE_URL}/v1/rest/datastore/F-C0032-001`,
       {
         params: {
           Authorization: CWA_API_KEY,
-          locationName: "宜蘭縣",
+          locationName: city,
         },
       }
     );
 
-    // 取得高雄市的天氣資料
+    // 取得指定城市天氣
     const locationData = response.data.records.location[0];
 
     if (!locationData) {
       return res.status(404).json({
         error: "查無資料",
-        message: "無法取得高雄市天氣資料",
+        message: `無法取得${city}天氣資料`,
       });
     }
 
@@ -126,12 +137,16 @@ const getKaohsiungWeather = async (req, res) => {
   }
 };
 
-// Routes
+// ⭐更新：路由名稱改成通用（不限高雄）
+app.get("/api/weather/:city", getWeatherByCity);
+
+// ⭐新增：首頁提示
 app.get("/", (req, res) => {
   res.json({
     message: "歡迎使用 CWA 天氣預報 API",
     endpoints: {
-      kaohsiung: "/api/weather/kaohsiung",
+      example: "/api/weather/台北市",
+      example2: "/api/weather/高雄市",
       health: "/api/health",
     },
   });
@@ -140,9 +155,6 @@ app.get("/", (req, res) => {
 app.get("/api/health", (req, res) => {
   res.json({ status: "OK", timestamp: new Date().toISOString() });
 });
-
-// 取得高雄天氣預報
-app.get("/api/weather/kaohsiung", getKaohsiungWeather);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
